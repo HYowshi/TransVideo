@@ -24,26 +24,25 @@ jobs:
       - name: Set up Python 3.10
         run: uv python install 3.10
 
-      - name: Install project dependencies
-        run: uv sync --locked
+      - name: Build lightweight launcher
+        run: uv run --with pyinstaller pyinstaller --clean --noconfirm --onefile --windowed --icon videotrans/styles/icon.ico --name TransVideo packaging/launcher.py
 
-      - name: Bundle FFmpeg
+      - name: Prepare web installer payload
         shell: pwsh
         run: |
-          choco install ffmpeg --yes --no-progress
-          New-Item -ItemType Directory -Force -Path ffmpeg | Out-Null
-          Copy-Item (Get-Command ffmpeg.exe).Source ffmpeg/ffmpeg.exe -Force
-          Copy-Item (Get-Command ffprobe.exe).Source ffmpeg/ffprobe.exe -Force
-          Copy-Item (Get-Command ffplay.exe).Source ffmpeg/ffplay.exe -Force
-
-      - name: Build portable app with PyInstaller
-        run: uv run pyinstaller --clean --noconfirm packaging/TransVideo.spec
+          $stage = "installer-staging/TransVideo"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          robocopy . $stage /MIR /XD .git .github .venv .pytest_cache tmp output logs models dist build installer-dist installer-staging __pycache__ /XF *.pyc *.pyo
+          if ($LASTEXITCODE -gt 7) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path "$stage/bin" | Out-Null
+          Copy-Item dist/TransVideo.exe "$stage/TransVideo.exe" -Force
+          Copy-Item (Get-Command uv.exe).Source "$stage/bin/uv.exe" -Force
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 
       - name: Build Windows installer
-        run: iscc packaging/installer.iss
+        run: iscc packaging/web-installer.iss
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
