@@ -7,7 +7,7 @@ from typing import Union
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from videotrans import translator, recognition, tts
 from videotrans.component.progressbar import ClickableProgressBar
@@ -55,6 +55,24 @@ class WinAction(WinActionBase):
         self.quick_source_url = ""
         self.quick_downloaded_files = []
 
+    def show_quick_help(self):
+        QMessageBox.information(
+            self.main,
+            "Hướng dẫn dịch video nhanh",
+            (
+                "1. Dán link video vào ô Dịch video nhanh.\n"
+                "2. Bật Lồng tiếng nếu muốn có giọng đọc tiếng Việt.\n"
+                "3. Giữ Xóa video tạm để app tự xóa file nguồn sau khi ra final.\n"
+                "4. Bấm Start và chờ video hoàn tất trong thư mục output/quick-videos.\n\n"
+                "Mẹo tải video:\n"
+                "- Với BiliBili, hãy mở link bằng Edge/Chrome, đăng nhập nếu cần và phát thử vài giây.\n"
+                "- Nếu website chặn tải tự động, tải MP4 thủ công rồi chọn file trong app.\n\n"
+                "Mẹo dịch:\n"
+                "- Nếu bạn đã cấu hình API AI, TransVideo ưu tiên kênh đó để dịch tự nhiên hơn.\n"
+                "- Nếu không có API, app dùng kênh miễn phí và tự fallback khi có thể."
+            ),
+        )
+
     def _quick_url(self):
         return self.main.quick_url.text().strip()
 
@@ -74,6 +92,24 @@ class WinAction(WinActionBase):
                 return True
         return False
 
+    def _choose_quick_translate_channel(self):
+        from videotrans import translator as translator_module
+
+        preferred = [
+            translator_module.DEEPSEEK_INDEX,
+            translator_module.GEMINI_INDEX,
+            translator_module.CHATGPT_INDEX,
+            translator_module.QWENMT_INDEX,
+            translator_module.OPENROUTER_INDEX,
+        ]
+        for index in preferred:
+            provider = translator_module._ID_NAME_DICT.get(index)
+            if provider and provider.key_name and params.get(provider.key_name):
+                self.main.translate_type.setCurrentIndex(index)
+                self.main.quick_status.setText(f"Đã chọn kênh dịch thông minh: {provider.name}")
+                return
+        self.main.translate_type.setCurrentIndex(translator_module.GOOGLE_INDEX)
+
     def _apply_quick_defaults(self):
         if self.main.app_mode != "biaozhun":
             self.set_biaozhun()
@@ -81,6 +117,7 @@ class WinAction(WinActionBase):
         self.main.subtitle_type.setCurrentIndex(1)
         self.main.only_out_mp4.setChecked(True)
         self.main.clear_cache.setChecked(True)
+        self._choose_quick_translate_channel()
         self._set_language_by_code(self.main.source_language, "zh-cn", "zh", "zh-hans")
         self._set_language_by_code(self.main.target_language, "vi", "vi-vn")
         if not self.main.quick_dubbing.isChecked():

@@ -41,6 +41,12 @@ def _friendly_download_error(url: str, message: str) -> str:
     return raw
 
 
+def _browser_cookie_attempts(url: str) -> list[tuple[str, ...]]:
+    if _is_bilibili_url(url):
+        return [("edge",), ("chrome",), ("firefox",)]
+    return []
+
+
 def _require_ytdlp():
     if importlib.util.find_spec("yt_dlp") is None:
         raise VideoDownloadError(
@@ -79,51 +85,71 @@ def download_video(
         elif status == "finished":
             progress("Tải xong, đang chuẩn bị file video...")
 
-    options = {
-        "format": "bv*+ba/best",
+    base_options = {
         "merge_output_format": "mp4",
         "outtmpl": str(target_dir / "%(title).180B-%(id)s.%(ext)s"),
         "noplaylist": True,
+        "ignoreerrors": False,
         "restrictfilenames": True,
         "quiet": True,
         "no_warnings": True,
-        "retries": 3,
-        "fragment_retries": 3,
-        "socket_timeout": 30,
+        "retries": 5,
+        "fragment_retries": 5,
+        "file_access_retries": 3,
+        "extractor_retries": 3,
+        "socket_timeout": 45,
+        "continuedl": True,
+        "nopart": False,
+        "concurrent_fragment_downloads": 4,
         "user_agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         ),
         "progress_hooks": [hook],
     }
+    format_attempts = [
+        ("video tốt nhất", "bv*+ba/best"),
+        ("MP4 tương thích", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"),
+        ("file đơn giản", "best"),
+    ]
+    options = dict(base_options)
     if _is_bilibili_url(url):
         options["referer"] = "https://www.bilibili.com/"
+        options["extractor_args"] = {"bilibili": {"prefer_multi_flv": ["False"]}}
+
+    def extract_with_options(attempt_options):
+        with YoutubeDL(attempt_options) as ydl:
+            info = ydl.extract_info(url, download=True)
+            downloaded = ydl.prepare_filename(info)
+            requested = info.get("requested_downloads") or []
+            if requested and requested[0].get("filepath"):
+                downloaded = requested[0]["filepath"]
+            return downloaded
 
     try:
-        try:
-            with YoutubeDL(options) as ydl:
-                info = ydl.extract_info(url, download=True)
-        except Exception as first_error:
-            if not _is_bilibili_url(url):
-                raise
-            last_error = first_error
-            for browser in ("edge", "chrome"):
+        last_error = None
+        downloaded_path = None
+        browser_attempts = [None] + _browser_cookie_attempts(url)
+        for browser in browser_attempts:
+            for label, fmt in format_attempts:
                 retry_options = dict(options)
-                retry_options["cookiesfrombrowser"] = (browser,)
+                retry_options["format"] = fmt
+                if browser:
+                    retry_options["cookiesfrombrowser"] = browser
                 if progress:
-                    progress(f"BiliBili bị chặn, đang thử cookie từ {browser.title()}...")
+                    if browser:
+                        progress(f"Đang thử tải bằng cookie {browser[0].title()} - {label}...")
+                    else:
+                        progress(f"Đang thử tải - {label}...")
                 try:
-                    with YoutubeDL(retry_options) as ydl:
-                        info = ydl.extract_info(url, download=True)
+                    downloaded_path = extract_with_options(retry_options)
                     break
-                except Exception as cookie_error:
-                    last_error = cookie_error
-            else:
-                raise last_error
-        downloaded_path = ydl.prepare_filename(info)
-        requested = info.get("requested_downloads") or []
-        if requested and requested[0].get("filepath"):
-            downloaded_path = requested[0]["filepath"]
+                except Exception as attempt_error:
+                    last_error = attempt_error
+            if downloaded_path:
+                break
+        if not downloaded_path:
+            raise last_error or VideoDownloadError("Không tải được video.")
     except Exception as e:
         shutil.rmtree(target_dir, ignore_errors=True)
         raise VideoDownloadError(_friendly_download_error(url, str(e))) from e

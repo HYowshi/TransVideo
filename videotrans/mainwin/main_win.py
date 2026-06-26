@@ -47,7 +47,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 当前所有可用角色列表
         self.current_rolelist = []
         self.setWindowIcon(QIcon(f"{ROOT_DIR}/videotrans/styles/icon.ico"))
-        self.rawtitle = f"{tr('softname')} {VERSION} {tr('Documents')} pyvideotrans.com"
+        self.rawtitle = f"TransVideo {VERSION}"
         self.setWindowTitle(self.rawtitle)
 
         self.moshi = {
@@ -219,6 +219,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.proxy.textChanged.connect(self.win_action.change_proxy)
         self.import_sub.clicked.connect(self.win_action.import_sub_fun)
         self.quick_clear.clicked.connect(self.win_action.clear_quick_link)
+        self.quick_help.clicked.connect(self.win_action.show_quick_help)
 
         self.startbtn.clicked.connect(self.win_action.check_start)
         self.retrybtn.clicked.connect(self.win_action.retry)

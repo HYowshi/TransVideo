@@ -1,5 +1,5 @@
 #define MyAppName "TransVideo"
-#define MyAppVersion "4.03"
+#define MyAppVersion "1.0"
 #define MyAppPublisher "HYowshi"
 #define MyAppExeName "TransVideo.exe"
 

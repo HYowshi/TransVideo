@@ -2,7 +2,7 @@
 
 ## 1. Cài đặt
 
-1. Tải file `TransVideo-Web-Setup-4.03.exe` từ trang Release.
+1. Tải file `TransVideo-Web-Setup-1.0.exe` từ trang Release.
 2. Mở file cài đặt và bấm Next cho đến khi hoàn tất.
 3. Mở TransVideo từ Desktop hoặc Start Menu.
 4. Lần đầu mở app, bấm **Tải runtime và mở app**.
@@ -42,10 +42,10 @@ Cách xử lý:
 
 ## 5. Nếu lần tải runtime bị dừng giữa chừng
 
-Nếu mất mạng, tắt máy, hoặc đóng app khi runtime đang tải, lần mở sau TransVideo sẽ báo phát hiện cài đặt dang dở.
+Nếu mất mạng, tắt máy, hoặc đóng app khi runtime đang tải, lần mở sau TransVideo sẽ tự phát hiện cài đặt dang dở.
 
-Bạn bấm **Dọn cài lỗi**, sau đó bấm **Tải runtime và mở app** để tải lại sạch sẽ.
+App sẽ tự dọn `.venv` và file khóa cũ. Sau đó bạn chỉ cần bấm **Tải runtime và mở app** để tải lại sạch sẽ.
 
 ## 6. Gỡ cài đặt
 
-Mở Start Menu, chọn **Uninstall TransVideo**. Trình gỡ cài đặt sẽ dọn app, runtime `.venv`, thư mục tạm, log, output và models đã tải trong thư mục cài đặt.
+Mở Start Menu, chọn **Gỡ cài đặt TransVideo**. Trình gỡ cài đặt sẽ dọn app, runtime `.venv`, thư mục tạm, log, output và models đã tải trong thư mục cài đặt.

@@ -9,6 +9,7 @@ from tkinter import messagebox, scrolledtext
 
 
 APP_NAME = "TransVideo"
+APP_VERSION = "1.0"
 
 
 def app_root() -> Path:
@@ -27,8 +28,8 @@ CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 class Launcher(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(APP_NAME)
-        self.geometry("760x500")
+        self.title(f"{APP_NAME} {APP_VERSION}")
+        self.geometry("780x540")
         self.resizable(False, False)
         self.configure(bg="#17202A")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -37,7 +38,7 @@ class Launcher(tk.Tk):
 
         tk.Label(
             self,
-            text="TransVideo",
+            text=f"TransVideo {APP_VERSION}",
             font=("Segoe UI", 22, "bold"),
             fg="#FFFFFF",
             bg="#17202A",
@@ -70,8 +71,8 @@ class Launcher(tk.Tk):
         self.install_btn.pack(side="left")
         self.run_btn = tk.Button(row, text="Mở app", command=self.run_app, width=12)
         self.run_btn.pack(side="left", padx=10)
-        self.clean_btn = tk.Button(row, text="Dọn cài lỗi", command=self.clean_partial_install, width=12)
-        self.clean_btn.pack(side="left")
+        self.help_btn = tk.Button(row, text="Hướng dẫn", command=self.show_help, width=12)
+        self.help_btn.pack(side="left")
         tk.Button(row, text="Thoát", command=self.on_close, width=10).pack(side="right")
 
         self.after(300, self.auto_start)
@@ -85,9 +86,11 @@ class Launcher(tk.Tk):
         self.after(0, lambda value=text: self.write(value))
 
     def auto_start(self):
-        if INSTALL_MARKER.exists() and VENV.exists():
-            self.write("Phát hiện lần tải runtime trước bị dừng giữa chừng.")
-            self.write("Bấm 'Dọn cài lỗi' để xóa phần cài dang dở, sau đó tải lại.")
+        if INSTALL_MARKER.exists():
+            self.write("Phát hiện runtime cài dang dở từ lần mở trước.")
+            self.write("Đang tự dọn .venv và file khóa cũ...")
+            self.clean_partial_install(show_done=False)
+            self.write("Đã dọn sạch. Bạn có thể bấm 'Tải runtime và mở app' để tải lại.")
             return
         if VENV.exists():
             self.run_app()
@@ -131,7 +134,7 @@ class Launcher(tk.Tk):
         self.installing = True
         self.install_btn.configure(state="disabled")
         self.run_btn.configure(state="disabled")
-        self.clean_btn.configure(state="disabled")
+        self.help_btn.configure(state="disabled")
         thread = threading.Thread(target=self._install_worker, daemon=True)
         thread.start()
 
@@ -154,7 +157,7 @@ class Launcher(tk.Tk):
         self.installing = False
         self.install_btn.configure(state="normal")
         self.run_btn.configure(state="normal")
-        self.clean_btn.configure(state="normal")
+        self.help_btn.configure(state="normal")
 
     def clean_partial_install(self, show_done: bool = True):
         if self.current_proc and self.current_proc.poll() is None:
@@ -183,8 +186,10 @@ class Launcher(tk.Tk):
         if not UV.exists():
             messagebox.showerror(APP_NAME, f"Không tìm thấy uv.exe tại {UV}")
             return
-        if INSTALL_MARKER.exists() and not VENV.exists():
-            messagebox.showwarning(APP_NAME, "Runtime cũ cài chưa xong. Hãy bấm 'Dọn cài lỗi' rồi tải lại.")
+        if INSTALL_MARKER.exists():
+            self.write("Runtime cũ cài chưa xong. Đang tự dọn...")
+            self.clean_partial_install(show_done=False)
+            messagebox.showinfo(APP_NAME, "Đã dọn runtime cài dang dở. Hãy bấm 'Tải runtime và mở app' để tải lại.")
             return
         if not VENV.exists():
             messagebox.showinfo(APP_NAME, "Chưa có runtime. Hãy bấm 'Tải runtime và mở app' để cài lần đầu.")
@@ -197,10 +202,54 @@ class Launcher(tk.Tk):
 
     def on_close(self):
         if self.installing:
-            if not messagebox.askyesno(APP_NAME, "Runtime đang được tải. Dừng và dọn phần cài dang dở?"):
+            if not messagebox.askyesno(APP_NAME, "Runtime đang được tải. Dừng tải và tự dọn phần cài dang dở?"):
                 return
             self.clean_partial_install(show_done=False)
         self.destroy()
+
+    def show_help(self):
+        win = tk.Toplevel(self)
+        win.title("Hướng dẫn sử dụng TransVideo")
+        win.geometry("680x520")
+        win.configure(bg="#17202A")
+        win.transient(self)
+        tk.Label(
+            win,
+            text="Hướng dẫn nhanh",
+            font=("Segoe UI", 18, "bold"),
+            fg="#FFFFFF",
+            bg="#17202A",
+        ).pack(anchor="w", padx=22, pady=(20, 8))
+        text = scrolledtext.ScrolledText(
+            win,
+            bg="#0F151B",
+            fg="#D8E2EA",
+            relief="flat",
+            wrap="word",
+            font=("Segoe UI", 10),
+        )
+        text.pack(fill="both", expand=True, padx=22, pady=(0, 18))
+        text.insert(
+            "1.0",
+            (
+                "1. Cài lần đầu\n"
+                "- Bấm 'Tải runtime và mở app'.\n"
+                "- App sẽ tải Python, PyTorch GPU/CPU và thư viện AI. Việc này có thể lâu nhưng chỉ làm một lần.\n"
+                "- Nếu mất mạng hoặc tắt app giữa chừng, lần mở sau TransVideo tự dọn .venv dang dở.\n\n"
+                "2. Dịch video bằng link\n"
+                "- Mở app, dán link vào ô 'Dịch video nhanh'.\n"
+                "- Bật 'Lồng tiếng' nếu muốn có giọng đọc tiếng Việt.\n"
+                "- Giữ 'Xóa video tạm' để app xóa video nguồn tải tạm sau khi ra final.\n"
+                "- Bấm Start và chờ video xuất ra thư mục output/quick-videos.\n\n"
+                "3. Link BiliBili bị lỗi 412\n"
+                "- Mở link bằng Edge hoặc Chrome, đăng nhập nếu cần, phát thử vài giây.\n"
+                "- Quay lại TransVideo bấm Start lại. App sẽ thử dùng cookie trình duyệt.\n\n"
+                "4. Khi nào chọn file thủ công?\n"
+                "- Nếu website chặn tải tự động hoặc link cần quyền riêng tư, tải MP4 thủ công rồi chọn file trong app.\n"
+            ),
+        )
+        text.configure(state="disabled")
+        tk.Button(win, text="Đã hiểu", command=win.destroy, width=12).pack(pady=(0, 18))
 
 
 if __name__ == "__main__":

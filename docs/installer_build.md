@@ -18,8 +18,8 @@ The installer is created in `installer-dist/`.
 Open the `Build TransVideo Installer` workflow and run it manually, or push a tag:
 
 ```powershell
-git tag v4.03-transvideo
-git push origin v4.03-transvideo
+git tag v1.0-transvideo
+git push origin v1.0-transvideo
 ```
 
-The workflow uploads `TransVideo-Setup-4.03.exe` as an artifact. Tag builds also attach it to a GitHub Release.
+The workflow uploads `TransVideo-Web-Setup-1.0.exe` as an artifact. Tag builds also attach it to a GitHub Release.

@@ -444,6 +444,7 @@ class WinActionBase:
         self.main.quick_url.setDisabled(type)
         self.main.quick_dubbing.setDisabled(type)
         self.main.quick_delete_source.setDisabled(type)
+        self.main.quick_help.setDisabled(type)
         self.main.quick_clear.setDisabled(type)
         self.main.volume_rate.setDisabled(type)
         self.main.pitch_rate.setDisabled(type)
