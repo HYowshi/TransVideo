@@ -48,7 +48,7 @@ class WinAction(WinActionBase):
 
     def clear_quick_link(self):
         self.main.quick_url.clear()
-        self.main.quick_status.setText("Dan link video, chon long tieng neu can, roi bam Start")
+        self.main.quick_status.setText("Dán link video, chọn lồng tiếng nếu cần, rồi bấm Start")
         if getattr(self, "quick_downloaded_files", None):
             self.queue_mp4 = []
             self.main.source_mp4.setText(tr("No select videos"))
@@ -97,13 +97,13 @@ class WinAction(WinActionBase):
         from videotrans.util.video_download import is_video_url
 
         if not is_video_url(url):
-            show_error("Please paste a valid video link.")
+            show_error("Hãy dán link video hợp lệ.")
             self.main.startbtn.setDisabled(False)
             return True
 
         self.main.startbtn.setDisabled(True)
-        self.main.quick_status.setText("Preparing download...")
-        self.main.source_mp4.setText("Downloading link...")
+        self.main.quick_status.setText("Đang chuẩn bị tải video...")
+        self.main.source_mp4.setText("Đang tải link...")
         self.queue_mp4 = []
         self.quick_source_url = ""
         self.quick_downloader = QuickDownloadWorker(url, self.main)
@@ -118,7 +118,7 @@ class WinAction(WinActionBase):
         self.quick_downloaded_files = [path]
         self.queue_mp4 = [path]
         self.main.source_mp4.setText(Path(path).name)
-        self.main.quick_status.setText("Downloaded. Starting translation workflow...")
+        self.main.quick_status.setText("Đã tải xong. Đang bắt đầu dịch và chèn phụ đề...")
         if not self.main.target_dir:
             quick_output = Path(ROOT_DIR) / "output" / "quick-videos"
             quick_output.mkdir(parents=True, exist_ok=True)
@@ -131,7 +131,7 @@ class WinAction(WinActionBase):
     def _quick_download_failed(self, message: str):
         self.queue_mp4 = []
         self.main.source_mp4.setText(tr("No select videos"))
-        self.main.quick_status.setText("Download failed")
+        self.main.quick_status.setText("Tải video thất bại")
         self.main.startbtn.setDisabled(False)
         show_error(message)
 

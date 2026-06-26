@@ -7,6 +7,14 @@
 
 # pyVideoTrans
 
+## TransVideo - bản Windows tiếng Việt
+
+TransVideo là bản tùy biến của pyVideoTrans cho workflow nhanh: dán link video, tự tải, dịch sang tiếng Việt, chèn phụ đề và tùy chọn lồng tiếng.
+
+- Tải installer: [TransVideo Releases](https://github.com/HYowshi/TransVideo/releases)
+- Hướng dẫn sử dụng: [docs/HUONG_DAN_SU_DUNG.md](docs/HUONG_DAN_SU_DUNG.md)
+- Lần đầu mở app sẽ tải runtime GPU/CPU và thư viện cần thiết. Các lần sau mở bằng `TransVideo.exe`, không cần CMD.
+
 <div align="center">
 
 **A Powerful Open Source Video Translation / Audio Transcription / AI Dubbing / Subtitle Translation Tool**

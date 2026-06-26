@@ -26,18 +26,19 @@ PrivilegesRequired=lowest
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Tạo lối tắt ngoài Desktop"; GroupDescription: "Lối tắt:"; Flags: unchecked
 
 [Files]
 Source: "..\installer-staging\TransVideo\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\Hướng dẫn sử dụng"; Filename: "{app}\docs\HUONG_DAN_SU_DUNG.md"
+Name: "{group}\Gỡ cài đặt {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Mở {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\.venv"
@@ -45,6 +46,8 @@ Type: filesandordirs; Name: "{app}\tmp"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\output"
 Type: filesandordirs; Name: "{app}\models"
+Type: files; Name: "{app}\.transvideo-installing"
+Type: files; Name: "{app}\.uv-sync.lock"
 Type: filesandordirs; Name: "{localappdata}\pyvideotrans"
 Type: filesandordirs; Name: "{tmp}\pyvideotrans"
 

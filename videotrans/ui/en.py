@@ -1050,18 +1050,18 @@ class Ui_MainWindow(object):
         self.btn_get_video.setToolTip(
             tr("Multiple MP4 videos can be selected and automatically queued for processing"))
         self.btn_get_video.setText(tr("Select audio & video"))
-        self.quick_title.setText("Quick Workflow")
-        self.quick_status.setText("Dan link video, chon long tieng neu can, roi bam Start")
+        self.quick_title.setText("Dịch video nhanh")
+        self.quick_status.setText("Dán link video, chọn lồng tiếng nếu cần, rồi bấm Start")
         self.quick_url.setPlaceholderText("https://...")
         self.quick_url.setToolTip(
-            "Paste a video URL. The app will download it, translate it, embed subtitles, and optionally dub it.")
-        self.quick_dubbing.setText("Long tieng")
+            "Dán link video. App sẽ tự tải, dịch, chèn phụ đề và có thể lồng tiếng nếu bạn bật tùy chọn.")
+        self.quick_dubbing.setText("Lồng tiếng")
         self.quick_dubbing.setToolTip(
-            "When checked, the selected TTS voice will be used. When unchecked, the app only translates and embeds subtitles.")
-        self.quick_delete_source.setText("Xoa video tai tam")
+            "Bật tùy chọn này nếu muốn dùng giọng TTS đã chọn. Tắt đi nếu chỉ muốn dịch và chèn phụ đề.")
+        self.quick_delete_source.setText("Xóa video tạm")
         self.quick_delete_source.setToolTip(
-            "Only deletes the temporary downloaded source video after the final output is created.")
-        self.quick_clear.setText("Xoa")
+            "Chỉ xóa video nguồn tải tạm sau khi đã tạo xong video final.")
+        self.quick_clear.setText("Xóa")
         self.btn_save_dir.setToolTip(tr("Select where to save the processed output resources"))
         self.btn_save_dir.setText(tr("Save to.."))
 
