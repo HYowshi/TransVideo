@@ -1,18 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from pathlib import Path
 
 
 block_cipher = None
+project_root = Path(SPECPATH).parent
 
 datas = [
-    ("videotrans/styles", "videotrans/styles"),
-    ("videotrans/language", "videotrans/language"),
-    ("videotrans/prompts", "videotrans/prompts"),
-    ("videotrans/voicejson", "videotrans/voicejson"),
-    ("ffmpeg", "ffmpeg"),
-    ("f5-tts", "f5-tts"),
-    ("law.txt", "."),
+    (str(project_root / "videotrans" / "styles"), "videotrans/styles"),
+    (str(project_root / "videotrans" / "language"), "videotrans/language"),
+    (str(project_root / "videotrans" / "prompts"), "videotrans/prompts"),
+    (str(project_root / "videotrans" / "voicejson"), "videotrans/voicejson"),
+    (str(project_root / "ffmpeg"), "ffmpeg"),
+    (str(project_root / "f5-tts"), "f5-tts"),
+    (str(project_root / "law.txt"), "."),
 ]
 
 for package in ("edge_tts", "gradio_client", "modelscope"):
@@ -25,8 +27,8 @@ hiddenimports = (
 )
 
 a = Analysis(
-    ["sp.py"],
-    pathex=[],
+    [str(project_root / "sp.py")],
+    pathex=[str(project_root)],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
