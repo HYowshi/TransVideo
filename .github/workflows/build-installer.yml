@@ -37,6 +37,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$stage/bin" | Out-Null
           Copy-Item dist/TransVideo.exe "$stage/TransVideo.exe" -Force
           Copy-Item (Get-Command uv.exe).Source "$stage/bin/uv.exe" -Force
+          exit 0
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
