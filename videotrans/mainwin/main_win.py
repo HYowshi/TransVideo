@@ -1,7 +1,10 @@
 from pathlib import Path
 from PySide6.QtCore import Qt,  QSettings, QEvent, QThreadPool, QCoreApplication
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QMessageBox, QMainWindow
+from PySide6.QtWidgets import (
+    QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QLineEdit, QComboBox, QCheckBox, QPushButton, QLabel
+)
 import asyncio, sys
 import os
 
@@ -31,6 +34,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.callback=callback
         self.resize(width, height)
         self.setupUi(self)
+        self._setup_basic_ui()
         self.callback("SetupUI end...")
 
         self.worker_threads = []
@@ -63,6 +67,103 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         s.start()
         self._set_default()
 
+    def _setup_basic_ui(self):
+        # 1. Lấy khung giao diện phức tạp gốc và ẩn nó đi
+        self.advanced_widget = self.centralWidget()
+        self.advanced_widget.hide()
+
+        # 2. Tạo khung giao diện Cơ Bản (Basic UI)
+        self.basic_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(50, 50, 50, 50)
+
+        # Chỗ nhập Link Video
+        layout.addWidget(QLabel("<b style='font-size: 16px;'>1. Nhập link video cần dịch:</b>"))
+        self.basic_url_input = QLineEdit()
+        self.basic_url_input.setPlaceholderText("Dán link YouTube, TikTok, Facebook... vào đây")
+        self.basic_url_input.setStyleSheet("padding: 10px; font-size: 14px;")
+        layout.addWidget(self.basic_url_input)
+
+        # Chọn Ngôn ngữ
+        layout.addWidget(QLabel("<b style='font-size: 16px;'>2. Dịch sang ngôn ngữ:</b>"))
+        self.basic_lang_combo = QComboBox()
+        self.basic_lang_combo.setStyleSheet("padding: 10px; font-size: 14px;")
+        layout.addWidget(self.basic_lang_combo)
+
+        # Tùy chọn lồng tiếng
+        self.basic_dub_check = QCheckBox("Có tạo lồng tiếng (Dubbing) không?")
+        self.basic_dub_check.setChecked(True)
+        self.basic_dub_check.setStyleSheet("font-size: 16px;")
+        layout.addWidget(self.basic_dub_check)
+
+        # Nút Bắt đầu khổng lồ
+        self.basic_start_btn = QPushButton("🚀 BẮT ĐẦU CHẠY")
+        self.basic_start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745; color: white; 
+                font-size: 20px; font-weight: bold; 
+                padding: 15px; border-radius: 8px;
+            }
+            QPushButton:hover { background-color: #218838; }
+        """)
+        layout.addWidget(self.basic_start_btn)
+
+        # Nút chuyển đổi Nâng cao
+        self.toggle_adv_btn = QPushButton("⚙️ Cài đặt nâng cao (Advanced)")
+        self.toggle_adv_btn.setStyleSheet("padding: 10px; font-size: 14px;")
+        layout.addWidget(self.toggle_adv_btn)
+        layout.addStretch()
+
+        self.basic_widget.setLayout(layout)
+
+        # 3. Tạo vùng chứa tổng gộp cả 2 giao diện
+        self.main_container = QWidget()
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.basic_widget)
+        main_layout.addWidget(self.advanced_widget)
+        self.main_container.setLayout(main_layout)
+
+        self.setCentralWidget(self.main_container)
+
+        # 4. Gắn các sự kiện (Signals)
+        self.toggle_adv_btn.clicked.connect(self._toggle_adv_mode)
+        self.basic_start_btn.clicked.connect(self._on_basic_start_clicked)
+
+    def _toggle_adv_mode(self):
+        # Ẩn/hiện giao diện phức tạp
+        if self.advanced_widget.isVisible():
+            self.advanced_widget.hide()
+            self.basic_widget.show()
+        else:
+            self.advanced_widget.show()
+            self.basic_widget.hide()
+
+    def _on_basic_start_clicked(self):
+        # Đồng bộ dữ liệu từ Cơ bản -> Giao diện gốc để chạy
+        url = self.basic_url_input.text().strip()
+        if not url:
+            QMessageBox.warning(self, "Lỗi", "Vui lòng nhập link video!")
+            return
+
+        # Điền tạm URL vào 1 ô text của UI cũ (hoặc xử lý gán link vào hệ thống)
+        # Vì giao diện cũ của bạn dùng tự chọn file (btn_get_video), 
+        # nên bạn cần bắn URL này cho hàm xử lý download của bạn. 
+        # Tạm thời ta set lang và dubbing trước:
+        lang = self.basic_lang_combo.currentText()
+        if lang:
+            self.target_language.setCurrentText(lang)
+
+        if self.basic_dub_check.isChecked():
+            # Bật TTS (Giả sử index 1 là có lồng tiếng - vd Edge TTS)
+            if self.tts_type.count() > 1:
+                self.tts_type.setCurrentIndex(1) 
+        else:
+            self.tts_type.setCurrentIndex(0) # Tắt lồng tiếng
+
+        # Gọi nút Start gốc chạy dưới nền
+        self.startbtn.click()
+
     def _set_default(self):
         self.callback('import recognition ...')
         from videotrans import recognition
@@ -78,6 +179,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.source_language.addItems(self.languagename)
         # 目标语言渠道
         self.target_language.addItems(["-"] + self.languagename)
+        self.basic_lang_combo.addItems(["-"] + self.languagename)
         # 填充配音渠道列表
 
         self.tts_type.addItems(tts.TTS_NAME_LIST)
