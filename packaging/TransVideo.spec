@@ -59,7 +59,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="videotrans/styles/icon.ico",
+    icon=str(project_root / "videotrans" / "styles" / "icon.ico"),
 )
 
 coll = COLLECT(
