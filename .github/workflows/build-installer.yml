@@ -27,12 +27,6 @@ jobs:
       - name: Install project dependencies
         run: uv sync --locked
 
-      - name: Use CPU PyTorch wheels for smaller installer
-        shell: pwsh
-        run: |
-          uv pip uninstall torch torchvision torchaudio triton-windows --yes
-          uv pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cpu
-
       - name: Bundle FFmpeg
         shell: pwsh
         run: |

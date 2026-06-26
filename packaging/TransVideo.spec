@@ -17,14 +17,33 @@ datas = [
     (str(project_root / "law.txt"), "."),
 ]
 
-for package in ("edge_tts", "gradio_client", "modelscope"):
+for package in ("edge_tts", "gradio_client"):
     datas += collect_data_files(package)
 
-hiddenimports = (
-    collect_submodules("videotrans")
-    + collect_submodules("edge_tts")
-    + collect_submodules("yt_dlp")
-)
+hiddenimports = [
+    "videotrans.recognition._whisper",
+    "videotrans.translator._google",
+    "videotrans.translator._microsoft",
+    "videotrans.tts._edgetts",
+    "videotrans.tts._gtts",
+    "videotrans.util.video_download",
+] + collect_submodules("edge_tts") + collect_submodules("yt_dlp")
+
+excludes = [
+    "torch",
+    "torchaudio",
+    "torchvision",
+    "triton",
+    "triton-windows",
+    "transformers",
+    "diffusers",
+    "modelscope",
+    "funasr",
+    "pyannote",
+    "speechbrain",
+    "datasets",
+    "tensorflow",
+]
 
 a = Analysis(
     [str(project_root / "sp.py")],
@@ -35,7 +54,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
