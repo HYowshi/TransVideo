@@ -153,6 +153,8 @@ class WinAction(WinActionBase):
                 risky_ratio=0.2,
                 overlap_count=0,
                 long_gap_ratio=0.0,
+                suggested_total_ms=0,
+                original_total_ms=0,
             )
             tuning = recommend_tuning(seed_report)
             apply_tuning_to_main_window(self.main, tuning)

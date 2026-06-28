@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: transvideo-installer-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -19,12 +23,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
       - name: Set up Python 3.10
         run: uv python install 3.10
+
+      - name: Validate packaging inputs
+        shell: pwsh
+        run: |
+          $required = @(
+            "packaging/launcher.py",
+            "packaging/version_info.txt",
+            "packaging/web-installer.iss",
+            "videotrans/styles/icon.ico",
+            "pyproject.toml",
+            "uv.lock"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) { throw "Missing required packaging file: $path" }
+          }
 
       - name: Build lightweight launcher
         run: uv run --with pyinstaller pyinstaller --clean --noconfirm --onefile --windowed --icon videotrans/styles/icon.ico --version-file packaging/version_info.txt --name TransVideo packaging/launcher.py
@@ -87,6 +108,19 @@ jobs:
             "$hash  $($_.Name)"
           } | Set-Content installer-dist\SHA256SUMS.txt -Encoding ascii
 
+      - name: Create release notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          @"
+          TransVideo $tag
+
+          - Web installer nhe, runtime tai sau lan mo dau.
+          - Co checksum SHA256 de kiem tra file tai ve.
+          - Neu cau hinh WINDOWS_CERTIFICATE_PFX va WINDOWS_CERTIFICATE_PASSWORD, workflow se ky so exe/installer.
+          - BandMatch auto-tune duoc bat trong pipeline long tieng.
+          "@ | Set-Content installer-dist\RELEASE_NOTES.txt -Encoding utf8
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -94,12 +128,15 @@ jobs:
           path: |
             installer-dist/*.exe
             installer-dist/SHA256SUMS.txt
+            installer-dist/RELEASE_NOTES.txt
           if-no-files-found: error
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: installer-dist/RELEASE_NOTES.txt
           files: |
             installer-dist/*.exe
             installer-dist/SHA256SUMS.txt
+            installer-dist/RELEASE_NOTES.txt

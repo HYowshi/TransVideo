@@ -280,6 +280,8 @@ class SpeedRate:
             pass
 
         self.audio_speed_rubberband = shutil.which("rubberband")
+        self.bandmatch_report = None
+        self.bandmatch_lines = {}
         logger.debug(f"[SpeedRate] Init. AudioRate={self.should_audiorate}, VideoRate={self.should_videorate}, Rubberband={bool(self.audio_speed_rubberband)}")
         if not HAS_RUBBERBAND or not self.audio_speed_rubberband:
             logger.warning(f"[SpeedRate] Rubberband 不可用，将使用pydub+ffmpeg处理音频加速。\n建议安装，加速效果更佳\n{INSTALL_RUBBERBAND_TIPS}")
@@ -380,18 +382,30 @@ class SpeedRate:
                 current['dubb_time'] = len(AudioSegment.from_file(current['filename']))
 
         try:
-            from videotrans.bandmatch import analyze_subtitles, recommend_tuning
+            from videotrans.bandmatch import analyze_subtitles, line_pressure_map, recommend_tuning
 
             report = analyze_subtitles(self.queue_tts, language="vi")
             tuning = recommend_tuning(report)
+            self.bandmatch_report = report
+            self.bandmatch_lines = line_pressure_map(report)
+            if settings.get("bandmatch_auto_tune", True):
+                if tuning.voice_autorate:
+                    self.should_audiorate = True
+                if tuning.video_autorate and self.novoice_mp4_original and Path(self.novoice_mp4_original).exists():
+                    self.should_videorate = True
+                if tuning.remove_silent_mid:
+                    self.remove_silent_mid = True
+                self.align_sub_audio = tuning.align_sub_audio
             logger.debug(
                 "[BandMatch] score=%s avg_pressure=%.3f p90_pressure=%.3f risky_ratio=%.3f "
-                "overlap=%s tuning=(audio=%s video=%s remove_gap=%s voice_rate=%s) reason=%s",
+                "overlap=%s suggested_total=%sms original_total=%sms tuning=(audio=%s video=%s remove_gap=%s voice_rate=%s) reason=%s",
                 report.score,
                 report.avg_pressure,
                 report.p90_pressure,
                 report.risky_ratio,
                 report.overlap_count,
+                report.suggested_total_ms,
+                report.original_total_ms,
                 tuning.voice_autorate,
                 tuning.video_autorate,
                 tuning.remove_silent_mid,
@@ -435,6 +449,8 @@ class SpeedRate:
 
             video_target = source_dur
             audio_target = source_dur
+            band_line = self.bandmatch_lines.get(it.get('line')) if self.bandmatch_lines else None
+            band_slot = max(source_dur, band_line.suggested_slot_ms) if band_line else source_dur
             
             mode_log = ""
             # 仅音频加速
@@ -449,8 +465,8 @@ class SpeedRate:
 
             elif not self.should_audiorate and self.should_videorate:
                 mode_log = "Only Video"
-                if dubb_dur > source_dur:
-                    video_target = dubb_dur
+                if max(dubb_dur, band_slot) > source_dur:
+                    video_target = max(dubb_dur, band_slot)
                     pts = video_target / source_dur
                     if pts > self.max_video_pts_rate:
                         video_target = int(source_dur * self.max_video_pts_rate)
@@ -458,14 +474,15 @@ class SpeedRate:
             elif self.should_audiorate and self.should_videorate:
                 mode_log = "Both"
                 if dubb_dur > source_dur:
-                    ratio = dubb_dur / source_dur
+                    desired_dur = max(dubb_dur, band_slot)
+                    ratio = desired_dur / source_dur
                     if ratio <= self.BOTH_MODE_AUDIO_ONLY_THRESHOLD:
                         # 倍率较小，仅加速音频即可，无需视频慢速
                         audio_target = source_dur
                         video_target = source_dur
                     else:
                         # 倍率较大，音频加速和视频慢速各自负担一半时间差
-                        diff = dubb_dur - source_dur
+                        diff = desired_dur - source_dur
                         joint_target = int(source_dur + (diff / 2))
                         audio_target = joint_target
                         video_target = joint_target

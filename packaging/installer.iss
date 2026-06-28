@@ -57,14 +57,21 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+Filename: "{cmd}"; Parameters: "/c taskkill /IM {#MyAppExeName} /F /T >nul 2>nul"; Flags: runhidden
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\tmp"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\output"
 Type: filesandordirs; Name: "{app}\models"
+Type: filesandordirs; Name: "{localappdata}\TransVideo"
 Type: filesandordirs; Name: "{localappdata}\pyvideotrans"
+Type: filesandordirs; Name: "{userappdata}\TransVideo"
+Type: filesandordirs; Name: "{userappdata}\pyvideotrans"
+Type: filesandordirs; Name: "{tmp}\TransVideo"
 Type: filesandordirs; Name: "{tmp}\pyvideotrans"
 
 [Registry]
 Root: HKCU; Subkey: "Software\TransVideo"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\pyvideotrans"; Flags: uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\pyvideotrans"; Flags: uninsdeletekey

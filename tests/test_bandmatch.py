@@ -1,4 +1,4 @@
-from videotrans.bandmatch import analyze_subtitles, estimate_speech_ms, recommend_tuning
+from videotrans.bandmatch import analyze_subtitles, estimate_speech_ms, line_pressure_map, recommend_tuning
 from videotrans.task.taskcfg import SrtItem
 
 
@@ -25,6 +25,7 @@ def test_analyze_subtitles_flags_dense_lines():
     assert report.score < 100
     assert report.risky_ratio > 0
     assert report.lines[1].risk in {"medium", "high"}
+    assert report.suggested_total_ms >= report.original_total_ms
 
 
 def test_recommend_tuning_enables_autorate_for_dense_subtitles():
@@ -45,3 +46,11 @@ def test_recommend_tuning_keeps_stable_timeline_for_easy_subtitles():
     assert tuning.voice_autorate is False
     assert tuning.video_autorate is False
     assert tuning.align_sub_audio is True
+
+
+def test_line_pressure_map_indexes_by_subtitle_line():
+    report = analyze_subtitles([_sub("xin chào", 1200, 2200, 7)], language="vi")
+    mapped = line_pressure_map(report)
+
+    assert 7 in mapped
+    assert mapped[7].suggested_slot_ms >= mapped[7].slot_ms

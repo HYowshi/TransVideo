@@ -19,6 +19,7 @@ class BandMatchLine:
     estimated_speech_ms: int
     pressure: float
     risk: str
+    suggested_slot_ms: int
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class BandMatchReport:
     risky_ratio: float
     overlap_count: int
     long_gap_ratio: float
+    suggested_total_ms: int
+    original_total_ms: int
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ def analyze_subtitles(subtitles: Iterable, *, language: str = "vi") -> BandMatch
             long_gaps += 1
         estimated = estimate_speech_ms(text, language=language)
         pressure = estimated / slot_ms if estimated else 0.0
+        suggested_slot_ms = max(slot_ms, int(round(estimated * 1.04))) if estimated else slot_ms
         rows.append(
             BandMatchLine(
                 line=_as_int(getter("line", index), index),
@@ -123,6 +127,7 @@ def analyze_subtitles(subtitles: Iterable, *, language: str = "vi") -> BandMatch
                 estimated_speech_ms=estimated,
                 pressure=round(pressure, 3),
                 risk=_risk_for_pressure(pressure),
+                suggested_slot_ms=suggested_slot_ms,
             )
         )
         previous_end = max(previous_end, end)
@@ -137,6 +142,8 @@ def analyze_subtitles(subtitles: Iterable, *, language: str = "vi") -> BandMatch
     risk_penalty = risky_ratio * 30
     overlap_penalty = min(25, overlaps * 5)
     score = int(round(max(0, min(100, 100 - pressure_penalty - risk_penalty - overlap_penalty))))
+    original_total_ms = max((line.end_time for line in rows), default=0)
+    suggested_total_ms = sum(line.suggested_slot_ms for line in rows)
     return BandMatchReport(
         lines=tuple(rows),
         score=score,
@@ -145,13 +152,17 @@ def analyze_subtitles(subtitles: Iterable, *, language: str = "vi") -> BandMatch
         risky_ratio=round(risky_ratio, 3),
         overlap_count=overlaps,
         long_gap_ratio=round(long_gap_ratio, 3),
+        suggested_total_ms=suggested_total_ms,
+        original_total_ms=original_total_ms,
     )
 
 
 def recommend_tuning(report: BandMatchReport) -> BandMatchTuning:
     pressure = report.p90_pressure
     needs_audio_rate = pressure >= 1.05 or report.risky_ratio >= 0.15
-    needs_video_rate = pressure >= 1.35 or report.risky_ratio >= 0.35
+    needs_video_rate = pressure >= 1.35 or report.risky_ratio >= 0.35 or (
+        report.original_total_ms > 0 and report.suggested_total_ms > report.original_total_ms * 1.18
+    )
     voice_rate = 0
     if pressure >= 1.08:
         voice_rate = min(18, max(4, int(round((pressure - 1.0) * 28))))
@@ -178,3 +189,7 @@ def apply_tuning_to_main_window(main, tuning: BandMatchTuning) -> None:
     main.align_sub_audio.setChecked(tuning.align_sub_audio)
     if hasattr(main, "voice_rate"):
         main.voice_rate.setValue(tuning.voice_rate_percent)
+
+
+def line_pressure_map(report: BandMatchReport) -> dict[int, BandMatchLine]:
+    return {line.line: line for line in report.lines}

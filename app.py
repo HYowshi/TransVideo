@@ -4,6 +4,7 @@ import runpy
 import sys
 from pathlib import Path
 
+APP_VERSION = "1.0"
 
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):
@@ -14,7 +15,12 @@ def main() -> int:
                 pass
     parser = argparse.ArgumentParser(description="TransVideo app entrypoint")
     parser.add_argument("--gpu-check", action="store_true", help="Kiểm tra GPU/encoder rồi thoát")
+    parser.add_argument("--version", action="store_true", help="In phiên bản TransVideo rồi thoát")
     args, passthrough = parser.parse_known_args()
+
+    if args.version:
+        print(f"TransVideo {APP_VERSION}")
+        return 0
 
     if args.gpu_check:
         module_path = Path(__file__).parent / "videotrans" / "util" / "gpu_diagnostics.py"

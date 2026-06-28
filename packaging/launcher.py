@@ -22,6 +22,7 @@ ROOT = app_root()
 UV = ROOT / "bin" / "uv.exe"
 VENV = ROOT / ".venv"
 INSTALL_MARKER = ROOT / ".transvideo-installing"
+RUNTIME_OK = ROOT / ".transvideo-runtime-ok"
 CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
@@ -92,15 +93,20 @@ class Launcher(tk.Tk):
             self.clean_partial_install(show_done=False)
             self.write("Đã dọn sạch. Bạn có thể bấm 'Tải runtime và mở app' để tải lại.")
             return
-        if VENV.exists():
+        if VENV.exists() and self.runtime_is_healthy():
             self.run_app()
             return
+        if VENV.exists():
+            self.write("Runtime hiện có không qua kiểm tra. Đang tự dọn để tải lại sạch...")
+            self.clean_partial_install(show_done=False)
         self.write("Chưa có runtime. Bấm 'Tải runtime và mở app' để cài lần đầu.")
         self.write("Nếu mạng bị ngắt hoặc máy bị tắt giữa chừng, app sẽ dọn phần cài dang dở trước khi tải lại.")
 
     def run_cmd(self, args):
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"
+        env["UV_LINK_MODE"] = "copy"
+        env["UV_HTTP_TIMEOUT"] = "120"
         self.current_proc = subprocess.Popen(
             args,
             cwd=ROOT,
@@ -143,6 +149,9 @@ class Launcher(tk.Tk):
             self.after(0, lambda: self.write("Đang tải/cài runtime..."))
             INSTALL_MARKER.write_text("installing", encoding="utf-8")
             self.run_cmd([str(UV), "sync", "--locked"])
+            self.after(0, lambda: self.write("Đang kiểm tra runtime..."))
+            self.run_cmd([str(UV), "run", "python", "-c", "import PySide6, yt_dlp; import videotrans"])
+            RUNTIME_OK.write_text("ok", encoding="utf-8")
             if INSTALL_MARKER.exists():
                 INSTALL_MARKER.unlink()
             self.after(0, lambda: self.write("Cài runtime xong. Đang mở app..."))
@@ -170,7 +179,7 @@ class Launcher(tk.Tk):
                 except Exception:
                     pass
         self.current_proc = None
-        for path in [VENV, INSTALL_MARKER, ROOT / ".uv-sync.lock"]:
+        for path in [VENV, INSTALL_MARKER, RUNTIME_OK, ROOT / ".uv-sync.lock"]:
             try:
                 if path.is_dir():
                     shutil.rmtree(path, ignore_errors=True)
@@ -191,7 +200,10 @@ class Launcher(tk.Tk):
             self.clean_partial_install(show_done=False)
             messagebox.showinfo(APP_NAME, "Đã dọn runtime cài dang dở. Hãy bấm 'Tải runtime và mở app' để tải lại.")
             return
-        if not VENV.exists():
+        if not VENV.exists() or not self.runtime_is_healthy():
+            if VENV.exists():
+                self.write("Runtime không qua kiểm tra. Đang tự dọn để tải lại...")
+                self.clean_partial_install(show_done=False)
             messagebox.showinfo(APP_NAME, "Chưa có runtime. Hãy bấm 'Tải runtime và mở app' để cài lần đầu.")
             return
         try:
@@ -199,6 +211,9 @@ class Launcher(tk.Tk):
             self.destroy()
         except Exception as e:
             messagebox.showerror(APP_NAME, str(e))
+
+    def runtime_is_healthy(self):
+        return VENV.exists() and (VENV / "pyvenv.cfg").exists() and RUNTIME_OK.exists()
 
     def on_close(self):
         if self.installing:
