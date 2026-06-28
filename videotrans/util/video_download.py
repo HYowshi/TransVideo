@@ -1,12 +1,13 @@
 import importlib.util
+import json
 import re
 import shutil
-import uuid
 from pathlib import Path
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from videotrans.configure.config import TEMP_ROOT
+from videotrans.pipeline.plan import stable_key
 
 
 class VideoDownloadError(RuntimeError):
@@ -81,8 +82,20 @@ def download_video(
 
     YoutubeDL = _require_ytdlp()
     base_dir = Path(output_dir or (Path(TEMP_ROOT) / "quick_downloads"))
-    target_dir = base_dir / f"job-{uuid.uuid4().hex[:10]}"
+    cache_key = stable_key(url)
+    target_dir = base_dir / f"job-{cache_key}"
     target_dir.mkdir(parents=True, exist_ok=True)
+    meta_file = target_dir / "download.json"
+    if meta_file.exists():
+        try:
+            cached = json.loads(meta_file.read_text(encoding="utf-8"))
+            cached_path = Path(cached.get("path", ""))
+            if cached.get("url") == url and cached_path.exists() and cached_path.stat().st_size > 1024:
+                if progress:
+                    progress("Video đã có trong cache, bỏ qua bước tải lại.")
+                return cached_path.resolve().as_posix()
+        except Exception:
+            pass
 
     def hook(d):
         if not progress:
@@ -99,7 +112,7 @@ def download_video(
 
     base_options = {
         "merge_output_format": "mp4",
-        "outtmpl": str(target_dir / "%(title).180B-%(id)s.%(ext)s"),
+        "outtmpl": str(target_dir / f"source-{cache_key}.%(ext)s"),
         "paths": {"home": str(target_dir)},
         "noplaylist": True,
         "ignoreerrors": False,
@@ -174,4 +187,8 @@ def download_video(
         shutil.rmtree(target_dir, ignore_errors=True)
         raise VideoDownloadError("Tải video xong nhưng không tìm thấy file đầu ra.")
 
+    meta_file.write_text(
+        json.dumps({"url": url, "cache_key": cache_key, "path": path.resolve().as_posix()}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     return path.resolve().as_posix()

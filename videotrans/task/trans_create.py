@@ -28,6 +28,18 @@ from videotrans.configure.excepts import VideoTransError, FFmpegError, SpeechToT
 from videotrans.util.help_misc import vail_file, read_last_n_lines, is_novoice_mp4, get_md5
 from videotrans.util.help_srt import get_subtitle_from_srt, delete_punc, ms_to_time_string, simple_wrap, set_ass_font
 from videotrans.util.media_quality import preferred_audio_encode_args, preferred_movflags, preferred_video_encode_args
+from videotrans.pipeline.plan import (
+    ProjectPlan,
+    audio_normalize_plan,
+    build_timeline,
+    build_translation_batches,
+    load_project_plan,
+    mark_node,
+    save_project_plan,
+    split_video_audio_info,
+    update_timeline_target_text,
+)
+from videotrans.pipeline.dag import transvideo_dag
 
 
 @dataclass
@@ -64,6 +76,7 @@ class TransCreate(BaseTask):
     clone_ref: str = ""
     cost_duration:float=0.0
     should_recogn2:bool=False
+    project_plan: ProjectPlan = field(default_factory=ProjectPlan, repr=False)
 
     def __post_init__(self):
         super().__post_init__()
@@ -154,6 +167,7 @@ class TransCreate(BaseTask):
         
         self.cfg.vocal = f"{self.cfg.cache_folder}/vocal.wav"
         self.cfg.instrument = f"{self.cfg.cache_folder}/instrument.wav"
+        self.project_plan = load_project_plan(self.cfg.target_dir)
         
         # 记录最终使用的配置信息
         logger.debug(f"[TransCreate]最终配置信息：{self=}\n{self.cfg=}")
@@ -171,6 +185,103 @@ class TransCreate(BaseTask):
         if app_cfg.exec_mode != 'cli':
             threading.Thread(target=runing, daemon=True).start()
 
+    def _save_project_plan(self):
+        try:
+            save_project_plan(self.cfg.target_dir, self.project_plan)
+        except Exception as e:
+            logger.debug(f"[ProjectPlan] save skipped: {e}")
+
+    def _mark_project_node(self, name: str, **meta):
+        try:
+            mark_node(self.project_plan, name, **meta)
+            self._save_project_plan()
+        except Exception as e:
+            logger.debug(f"[ProjectPlan] mark node skipped: {name}: {e}")
+
+    def _update_project_preflight(self, audio_stream_len: int = 0):
+        try:
+            video, audio = split_video_audio_info(self.video_info)
+            audio["streams"] = int(audio_stream_len or audio.get("streams") or 0)
+            audio["normalize"] = audio_normalize_plan(
+                enabled=bool(self.should_dubbing),
+                source_path=self.cfg.target_wav if self.should_dubbing else self.cfg.name,
+            )
+            self.project_plan.source_path = self.cfg.name
+            download_meta = Path(self.cfg.name).parent / "download.json"
+            if download_meta.exists():
+                try:
+                    meta = json.loads(download_meta.read_text(encoding="utf-8"))
+                    self.project_plan.source_url = meta.get("url", "")
+                    self.project_plan.cache_key = meta.get("cache_key", "")
+                except Exception:
+                    pass
+            self.project_plan.video = video
+            self.project_plan.audio = audio
+            self.project_plan.audio_normalize = audio["normalize"]
+            self.project_plan.render = {
+                "subtitle_type": self.cfg.subtitle_type,
+                "needs_dubbing": bool(self.should_dubbing),
+                "needs_audio_normalize": bool(self.should_dubbing),
+                "needs_video_encode": bool(self.cfg.subtitle_type in [1, 3] or self.cfg.video_autorate),
+                "can_skip_dubbing_nodes": not bool(self.should_dubbing),
+            }
+            self.project_plan.dag["planned"] = transvideo_dag().plan(
+                {
+                    "has_audio": audio["streams"] > 0,
+                    "needs_recogn": bool(self.should_recogn),
+                    "needs_translate": bool(self.should_trans),
+                    "needs_dubbing": bool(self.should_dubbing),
+                    "needs_subtitle": bool(self.cfg.subtitle_type > 0),
+                }
+            )
+            mark_node(self.project_plan, "preflight", video_streams=video.get("streams"), audio_streams=audio.get("streams"))
+            self._save_project_plan()
+        except Exception as e:
+            logger.debug(f"[ProjectPlan] preflight skipped: {e}")
+
+    def _update_project_subtitles(self, *, source_items=None, target_items=None):
+        try:
+            source_items = source_items or (get_subtitle_from_srt(self.cfg.source_sub) if Path(self.cfg.source_sub).exists() else [])
+            self.project_plan.subtitles["source_srt"] = self.cfg.source_sub
+            self.project_plan.timeline = build_timeline(source_items, total_ms=int(self.video_time or 0))
+            self.project_plan.translation_batches = build_translation_batches(source_items)
+            if target_items is not None:
+                target_by_line = {int(it.get("line") or 0): it.get("text", "") for it in target_items}
+                for segment in self.project_plan.timeline:
+                    segment["target_text"] = target_by_line.get(int(segment.get("line") or 0), "")
+                self.project_plan.subtitles["target_srt"] = self.cfg.target_sub
+                mark_node(self.project_plan, "translate", target_srt=self.cfg.target_sub)
+            else:
+                mark_node(self.project_plan, "timeline", segments=len(self.project_plan.timeline))
+            self._save_project_plan()
+        except Exception as e:
+            logger.debug(f"[ProjectPlan] subtitles skipped: {e}")
+
+    def _update_project_after_align(self, rate_inst):
+        try:
+            if getattr(rate_inst, "bandmatch_report", None):
+                report = rate_inst.bandmatch_report
+                self.project_plan.bandmatch = {
+                    "score": report.score,
+                    "avg_pressure": report.avg_pressure,
+                    "p90_pressure": report.p90_pressure,
+                    "risky_ratio": report.risky_ratio,
+                    "overlap_count": report.overlap_count,
+                    "suggested_total_ms": report.suggested_total_ms,
+                    "original_total_ms": report.original_total_ms,
+                }
+            self.project_plan.timeline = build_timeline(self.queue_tts, total_ms=int(self.video_time or 0))
+            mark_node(
+                self.project_plan,
+                "align",
+                queue_tts=len(self.queue_tts),
+                audio_rate=bool(self.cfg.voice_autorate),
+                video_rate=bool(self.cfg.video_autorate),
+            )
+            self._save_project_plan()
+        except Exception as e:
+            logger.debug(f"[ProjectPlan] align skipped: {e}")
+
     # 1. 预处理，分离音视频、分离人声等
     def prepare(self) -> None:
         _st=time.time()
@@ -187,6 +298,7 @@ class TransCreate(BaseTask):
         self.video_time = self.video_info['time']
         # 音频时长，毫秒
         audio_stream_len = self.video_info.get('streams_audio', 0)
+        self._update_project_preflight(audio_stream_len)
 
         # 无视频流，不是音频，并且不是提取，报错
         if self.video_info.get('video_streams', 0) < 1 and not self.is_audio_trans and self.cfg.app_mode != 'tiqu':
@@ -270,6 +382,11 @@ class TransCreate(BaseTask):
         if self.cfg.vocal and Path(self.cfg.vocal).exists():
             self.clone_ref = self.cfg.vocal
         self.signal(text=tr('endfenliyinpin'))
+        self._mark_project_node(
+            "prepare",
+            source_wav=self.cfg.source_wav if audio_stream_len > 0 else "",
+            novoice_mp4=self.cfg.novoice_mp4 if not self.is_audio_trans else "",
+        )
         logger.debug(f'[预处理阶段结束耗时]:{time.time()-_st}s')
 
     # 开始识别
@@ -281,6 +398,7 @@ class TransCreate(BaseTask):
         self.signal(text=tr("kaishishibie"))
         if vail_file(self.cfg.source_sub):
             self.source_srt_list = get_subtitle_from_srt(self.cfg.source_sub, is_file=True)
+            self._update_project_subtitles(source_items=self.source_srt_list)
             if Path(self.cfg.target_dir + "/speaker.json").exists():
                 shutil.copy2(self.cfg.target_dir + "/speaker.json", self.cfg.cache_folder + "/speaker.json")
             self._recogn_succeed()
@@ -341,6 +459,7 @@ class TransCreate(BaseTask):
 
         self._save_srt_target(raw_subtitles, self.cfg.source_sub)
         self.source_srt_list = raw_subtitles
+        self._update_project_subtitles(source_items=self.source_srt_list)
 
         # 中英恢复标点符号
         if self.cfg.fix_punc==1 and self.cfg.detect_language[:2] in ['zh', 'en']:
@@ -597,6 +716,8 @@ class TransCreate(BaseTask):
 
         # 如果存在目标语言字幕，无需继续翻译，前台直接使用该字幕替换
         if vail_file(self.cfg.target_sub):
+            update_timeline_target_text(self.cfg.target_dir, self.cfg.target_sub)
+            self.project_plan = load_project_plan(self.cfg.target_dir)
             self.signal(
                 text=Path(self.cfg.target_sub).read_text(encoding="utf-8", errors="ignore"),
                 type='replace_subtitle'
@@ -604,6 +725,7 @@ class TransCreate(BaseTask):
             return
 
         rawsrt = get_subtitle_from_srt(self.cfg.source_sub, is_file=True)
+        self._update_project_subtitles(source_items=rawsrt)
         self.signal(text=tr('kaishitiquhefanyi'))
 
         target_srt = run_trans(
@@ -644,6 +766,7 @@ class TransCreate(BaseTask):
                 
         # 翻译后的字幕
         self._save_srt_target(target_srt, self.cfg.target_sub)
+        self._update_project_subtitles(source_items=rawsrt, target_items=target_srt)
 
         if self.cfg.app_mode == 'tiqu':
             _output_file = f"{self.cfg.target_dir}/{self.cfg.noextname}.srt"
@@ -684,6 +807,7 @@ class TransCreate(BaseTask):
             self._save_srt_target(subs, self.cfg.source_sub)
         if self.should_dubbing:
             self.signal(text=tr('The dubbing is finished'))
+            self._mark_project_node("dubbing", target_wav=self.cfg.target_wav, queue_tts=len(self.queue_tts))
             logger.debug(f'[语音合成阶段结束耗时]:{time.time()-_st}s')
 
     # 音画字幕对齐
@@ -719,6 +843,7 @@ class TransCreate(BaseTask):
             remove_silent_mid=self.cfg.remove_silent_mid  # 均在未启用音频加速和视频慢速时才起作用
         )
         self.queue_tts = rate_inst.run()
+        self._update_project_after_align(rate_inst)
 
         # 慢速处理后，更新新视频总时长，用于音视频对齐
         if vail_file(self.cfg.novoice_mp4):
@@ -760,6 +885,7 @@ class TransCreate(BaseTask):
         self.precent = self.precent + 3 if self.precent < 95 else self.precent
         self.signal(text=tr('kaishihebing'))
         self._join_video_audio_srt()
+        self._mark_project_node("assemble", output=self.cfg.targetdir_mp4)
         logger.debug(f'[音频+字幕+画面合成阶段结束耗时]:{time.time()-_st}s')
 
     def task_done(self) -> None:
@@ -1201,10 +1327,15 @@ class TransCreate(BaseTask):
             f'最终确定字幕嵌入类型:{self.cfg.subtitle_type} ,目标字幕语言:{subtitle_langcode}, 字幕文件:{process_end_subtitle}\n')
         # 单软 或双软
         if self.cfg.subtitle_type in [2, 4]:
+            self.project_plan.subtitles["prepared_srt"] = process_end_subtitle
+            self._mark_project_node("subtitle_prepare", prepared_srt=process_end_subtitle, hard=False)
             return os.path.basename(process_end_subtitle), subtitle_langcode
 
         # 硬字幕转为ass格式 并设置样式
         process_end_subtitle_ass = set_ass_font(process_end_subtitle)
+        self.project_plan.subtitles["prepared_srt"] = process_end_subtitle
+        self.project_plan.subtitles["prepared_ass"] = process_end_subtitle_ass
+        self._mark_project_node("subtitle_ass", prepared_srt=process_end_subtitle, prepared_ass=process_end_subtitle_ass)
         basename = os.path.basename(process_end_subtitle_ass)
         return basename, subtitle_langcode
 
