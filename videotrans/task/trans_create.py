@@ -27,6 +27,7 @@ from videotrans.configure.excepts import VideoTransError, FFmpegError, SpeechToT
 
 from videotrans.util.help_misc import vail_file, read_last_n_lines, is_novoice_mp4, get_md5
 from videotrans.util.help_srt import get_subtitle_from_srt, delete_punc, ms_to_time_string, simple_wrap, set_ass_font
+from videotrans.util.media_quality import preferred_audio_encode_args, preferred_movflags, preferred_video_encode_args
 
 
 @dataclass
@@ -1280,9 +1281,11 @@ class TransCreate(BaseTask):
                 "-i",
                 self.cfg.name,
                 "-vn",
-                "-b:a", "128k",
-                "-c:a",
-                "aac",
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
+                "-ac", "2",
+                "-ar", "48000",
+                "-b:a", "192k",
+                "-c:a", "aac",
                 self.cfg.source_wav_output
             ]
 
@@ -1314,10 +1317,8 @@ class TransCreate(BaseTask):
             if v_a_offset>100:
                 logger.debug(f'视频时长{duration_ms}ms-音频时长{audio_ms}ms={v_a_offset}ms,需延长音频')
                 _cmd.extend(['-af', f'apad=pad_dur={v_a_offset/1000.0}'])
-            _cmd.extend([
-                "-ac", "2", "-b:a", "128k", "-c:a", "aac",
-                os.path.basename(target_m4a)
-            ])
+            _cmd.extend(preferred_audio_encode_args(normalize=True, bitrate="192k"))
+            _cmd.append(os.path.basename(target_m4a))
             runffmpeg(_cmd, cmd_dir=self.cfg.cache_folder)
 
         shutil.copy2(target_m4a, self.cfg.target_wav_output)
@@ -1385,7 +1386,7 @@ class TransCreate(BaseTask):
                 "-i",
                 target_m4a_basename
             ]
-            enc_qua = ['-crf', f'{settings.get("crf", 23)}', '-preset', settings.get('preset', 'medium')]
+            enc_qua = preferred_video_encode_args()
             
             # 若选 cfr，无论是否有视频慢速，均固定帧率输出
             # 若选vfr仅在有视频慢速时使用，其他使用ffmpeg默认auto
@@ -1422,10 +1423,7 @@ class TransCreate(BaseTask):
                         f"language={subtitle_langcode}"
                     ])
 
-                cmd2 = [
-                    "-movflags",
-                    "+faststart",
-                ]
+                cmd2 = preferred_movflags()
                 if fps_mode:
                     cmd2.extend(fps_mode)
                 
@@ -1464,7 +1462,7 @@ class TransCreate(BaseTask):
                     '-c:a',
                     'copy',
                 ]
-                cmd3 = ["-movflags", "+faststart"]
+                cmd3 = preferred_movflags()
 
                 if fps_mode:
                     cmd3.extend(fps_mode)
@@ -1519,12 +1517,14 @@ class TransCreate(BaseTask):
             self.cfg.name,
             "-vn"
         ]
+        audio_filters = []
         # 如果视频时长大于音频 100ms，需延长
         v_a_offset=int(self.video_info['time'])-duration_ms
         if duration_ms>0 and v_a_offset>100:
-            cmd.extend(['-af', f'apad=pad_dur={v_a_offset/1000.0}'])
-            
-        cmd.extend(['-c:a', 'aac', '-b:a', '128k',output])
+            audio_filters.append(f'apad=pad_dur={v_a_offset/1000.0}')
+        audio_filters.append('loudnorm=I=-16:TP=-1.5:LRA=11')
+        audio_filters.append('aresample=48000')
+        cmd.extend(['-af', ",".join(audio_filters), '-ac', '2', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', output])
         return runffmpeg(cmd)
 
     # ffmpeg进度日志

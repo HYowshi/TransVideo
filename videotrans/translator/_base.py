@@ -11,6 +11,7 @@ from videotrans.configure.config import tr, settings, logger, TEMP_ROOT
 from videotrans.task.taskcfg import SrtItem
 from videotrans.util.help_srt import get_subtitle_from_srt,cleartext
 from videotrans.util.help_misc import get_md5,serial
+from videotrans.translator.guard import align_srt_result, preserve_missing_lines, split_text_result
 
 @dataclass
 class BaseTrans(BaseCon):
@@ -94,7 +95,11 @@ class BaseTrans(BaseCon):
             if not result:
                 result = cleartext(self._item_task(it))
                 self._set_cache(it, result)
-            sep_res = result.split("\n")
+            sep_res = split_text_result(result, len(it))
+            sep_res = preserve_missing_lines(
+                [self.text_list[(i * self.trans_thread) + x] for x in range(len(it)) if (i * self.trans_thread) + x < len(self.text_list)],
+                sep_res,
+            )
             for x, result_item in enumerate(sep_res):
                 if x < len(it):
                     target_list.append(result_item.strip())
@@ -154,8 +159,9 @@ class BaseTrans(BaseCon):
                 _empty_line += 1
         if _empty_line >= len(raws_list):
             raise TranslateSrtError(tr("Translate result is empty")+f'\n{self.api_url}')
-        logger.debug(f'原始字幕行数：{len(self.text_list)}, 翻译后行数:{len(raws_list)}')
-        return raws_list
+        aligned = align_srt_result(self.text_list, raws_list)
+        logger.debug(f'原始字幕行数：{len(self.text_list)}, 翻译后行数:{len(raws_list)}, 对齐后:{len(aligned)}')
+        return aligned
 
     def _set_cache(self, it, res_str):
         if not res_str.strip(): return

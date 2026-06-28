@@ -195,7 +195,7 @@ class Launcher(tk.Tk):
             messagebox.showinfo(APP_NAME, "Chưa có runtime. Hãy bấm 'Tải runtime và mở app' để cài lần đầu.")
             return
         try:
-            subprocess.Popen([str(UV), "run", "sp.py"], cwd=ROOT, creationflags=CREATE_NO_WINDOW)
+            subprocess.Popen([str(UV), "run", "app.py"], cwd=ROOT, creationflags=CREATE_NO_WINDOW)
             self.destroy()
         except Exception as e:
             messagebox.showerror(APP_NAME, str(e))

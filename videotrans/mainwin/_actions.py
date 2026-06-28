@@ -118,6 +118,9 @@ class WinAction(WinActionBase):
         self.main.only_out_mp4.setChecked(True)
         self.main.clear_cache.setChecked(True)
         self.main.aisendsrt.setChecked(True)
+        settings["crf"] = min(int(settings.get("crf", 23) or 23), 18)
+        if str(settings.get("preset", "medium")) in {"ultrafast", "superfast", "veryfast"}:
+            settings["preset"] = "medium"
         self._choose_quick_translate_channel()
         self._set_language_by_code(self.main.source_language, "zh-cn", "zh", "zh-hans")
         self._set_language_by_code(self.main.target_language, "vi", "vi-vn")
