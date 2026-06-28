@@ -7,20 +7,34 @@
 AppId={{7B9B7E0C-7D2D-45DD-93F9-8F4F8F53B7F0}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+AppPublisherURL=https://github.com/HYowshi/TransVideo
+AppSupportURL=https://github.com/HYowshi/TransVideo/issues
+AppUpdatesURL=https://github.com/HYowshi/TransVideo/releases
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\LICENSE
 OutputDir=..\installer-dist
 OutputBaseFilename=TransVideo-Web-Setup-{#MyAppVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} web runtime installer
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoVersion=1.0.0.0
+VersionInfoCopyright=Copyright (C) {#MyAppPublisher}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 SetupIconFile=..\videotrans\styles\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayName={#MyAppName} {#MyAppVersion}
 PrivilegesRequired=lowest
+CloseApplications=yes
+RestartApplications=no
+SetupLogging=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -30,6 +44,12 @@ Name: "desktopicon"; Description: "Tạo lối tắt ngoài Desktop"; GroupDescr
 
 [Files]
 Source: "..\installer-staging\TransVideo\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\.venv"
+Type: filesandordirs; Name: "{app}\tmp"
+Type: files; Name: "{app}\.transvideo-installing"
+Type: files; Name: "{app}\.uv-sync.lock"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -52,4 +72,5 @@ Type: filesandordirs; Name: "{localappdata}\pyvideotrans"
 Type: filesandordirs; Name: "{tmp}\pyvideotrans"
 
 [Registry]
+Root: HKCU; Subkey: "Software\TransVideo"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\pyvideotrans"; Flags: uninsdeletekeyifempty

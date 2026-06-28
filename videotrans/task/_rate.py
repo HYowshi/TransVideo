@@ -379,6 +379,28 @@ class SpeedRate:
             else:
                 current['dubb_time'] = len(AudioSegment.from_file(current['filename']))
 
+        try:
+            from videotrans.bandmatch import analyze_subtitles, recommend_tuning
+
+            report = analyze_subtitles(self.queue_tts, language="vi")
+            tuning = recommend_tuning(report)
+            logger.debug(
+                "[BandMatch] score=%s avg_pressure=%.3f p90_pressure=%.3f risky_ratio=%.3f "
+                "overlap=%s tuning=(audio=%s video=%s remove_gap=%s voice_rate=%s) reason=%s",
+                report.score,
+                report.avg_pressure,
+                report.p90_pressure,
+                report.risky_ratio,
+                report.overlap_count,
+                tuning.voice_autorate,
+                tuning.video_autorate,
+                tuning.remove_silent_mid,
+                tuning.voice_rate_percent,
+                tuning.reason,
+            )
+        except Exception as e:
+            logger.debug(f"[BandMatch] analyze skipped: {e}")
+
     def _calculate_adjustments(self):
         """计算策略"""
         tools.set_process(text="Calculating sync adjustments...", uuid=self.uuid)

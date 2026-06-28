@@ -117,18 +117,48 @@ class WinAction(WinActionBase):
         self.main.subtitle_type.setCurrentIndex(1)
         self.main.only_out_mp4.setChecked(True)
         self.main.clear_cache.setChecked(True)
+        self.main.aisendsrt.setChecked(True)
         self._choose_quick_translate_channel()
         self._set_language_by_code(self.main.source_language, "zh-cn", "zh", "zh-hans")
         self._set_language_by_code(self.main.target_language, "vi", "vi-vn")
         if not self.main.quick_dubbing.isChecked():
             self.main.voice_role.setCurrentText("No")
+            self.main.voice_autorate.setChecked(False)
+            self.main.video_autorate.setChecked(False)
+            self.main.remove_silent_mid.setChecked(False)
+            self.main.align_sub_audio.setChecked(True)
             return
+        self._apply_bandmatch_quick_tuning()
         if self.main.voice_role.currentText() in ["", "No", " "]:
             for i in range(self.main.voice_role.count()):
                 role = self.main.voice_role.itemText(i)
                 if role and role != "No":
                     self.main.voice_role.setCurrentText(role)
                     break
+
+    def _apply_bandmatch_quick_tuning(self):
+        try:
+            from videotrans.bandmatch import BandMatchReport, apply_tuning_to_main_window, recommend_tuning
+
+            # Before subtitles are recognized, seed a conservative profile for Chinese->Vietnamese reup videos.
+            # Real subtitle timing is analyzed later by the dubbing/rate pipeline.
+            seed_report = BandMatchReport(
+                lines=(),
+                score=78,
+                avg_pressure=1.12,
+                p90_pressure=1.18,
+                risky_ratio=0.2,
+                overlap_count=0,
+                long_gap_ratio=0.0,
+            )
+            tuning = recommend_tuning(seed_report)
+            apply_tuning_to_main_window(self.main, tuning)
+            self.main.quick_status.setText(f"BandMatch: {tuning.reason}")
+        except Exception:
+            self.main.voice_autorate.setChecked(True)
+            self.main.video_autorate.setChecked(False)
+            self.main.remove_silent_mid.setChecked(False)
+            self.main.align_sub_audio.setChecked(True)
 
     def _start_quick_download(self, url: str):
         from videotrans.util.video_download import is_video_url

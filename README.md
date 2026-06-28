@@ -13,6 +13,8 @@ TransVideo là bản tùy biến của pyVideoTrans cho workflow nhanh: dán lin
 
 - Tải installer: [TransVideo Releases](https://github.com/HYowshi/TransVideo/releases)
 - Hướng dẫn sử dụng: [docs/HUONG_DAN_SU_DUNG.md](docs/HUONG_DAN_SU_DUNG.md)
+- Thuật toán BandMatch: [docs/BANDMATCH.md](docs/BANDMATCH.md)
+- Ký số Windows: [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)
 - Lần đầu mở app sẽ tải runtime GPU/CPU và thư viện cần thiết. Các lần sau mở bằng `TransVideo.exe`, không cần CMD.
 
 <div align="center">
